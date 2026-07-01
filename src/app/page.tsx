@@ -9,6 +9,7 @@ import { Patient } from "@/types/patient";
 import { parse, differenceInWeeks, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarHeart, MapPin, User as UserIcon, Activity, CheckCircle, LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -142,9 +143,14 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-gray-800">Painel de Partos</h1>
           <p className="text-sm text-gray-500">Janela de 38 a 42 semanas</p>
         </div>
-        <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-rose-500 transition-colors">
-          <LogOut className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-4">
+          <Link href="/history" className="text-gray-400 hover:text-gray-800 transition-colors text-sm font-medium">
+            Histórico
+          </Link>
+          <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-rose-500 transition-colors">
+            <LogOut className="w-6 h-6" />
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}

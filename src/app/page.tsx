@@ -147,6 +147,9 @@ export default function Home() {
           <Link href="/history" className="text-gray-400 hover:text-gray-800 transition-colors text-sm font-medium">
             Histórico
           </Link>
+          <Link href="/settings" className="text-gray-400 hover:text-gray-800 transition-colors text-sm font-medium">
+            Configurações
+          </Link>
           <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-rose-500 transition-colors">
             <LogOut className="w-6 h-6" />
           </button>

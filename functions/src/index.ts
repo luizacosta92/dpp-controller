@@ -19,35 +19,49 @@ export const syncPatientData = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const { id, name, age, spouse, location, dpp } = data;
+    const { id, status, ...rest } = data;
+    let dpp = data.dpp;
     const patientRef = db.collection("patients").doc(String(id));
 
     const doc = await patientRef.get();
     
-    // Upsert na coleção patients
-    if (!doc.exists) {
-      // Nova paciente: status "Acompanhando"
-      await patientRef.set({
-        name,
-        age,
-        spouse,
-        location,
-        dpp,
-        status: "Acompanhando",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    } else {
-      // Paciente existente: atualiza apenas os dados cadastrais (preserva status)
-      await patientRef.update({
-        name,
-        age,
-        spouse,
-        location,
-        dpp,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+    // Normalize Status (remove spaces, ignore case)
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    const patientStatus = normalizedStatus === 'finalizado' ? 'Finalizado' : 'Acompanhando';
+
+    // Normalize Date (convert ISO to dd/MM/yyyy if necessary)
+    if (dpp && typeof dpp === 'string' && dpp.includes('T')) {
+      try {
+        const d = new Date(dpp);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        dpp = `${day}/${month}/${year}`;
+      } catch (e) {
+        // keep original if parsing fails
+      }
     }
+
+    // Shield local fields (ensure webhook never overwrites them)
+    delete rest.dnvStatus;
+    delete rest.last_edited_by;
+    delete rest.last_edited_at;
+
+    const payload = {
+      ...rest,
+      dpp,
+      status: patientStatus,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!doc.exists) {
+      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      // Only set initial DNV status for new patients
+      payload.dnvStatus = 'Solicitar';
+    }
+
+    // Upsert na coleção patients using merge: true to avoid overwriting existing shielded fields
+    await patientRef.set(payload, { merge: true });
 
     res.status(200).send({ success: true, message: 'Patient synced successfully' });
   } catch (error) {

@@ -178,7 +178,7 @@ export default function Home() {
     return (
       <div 
         key={patient.id} 
-        onClick={() => router.push(`/paciente/${patient.id}`)}
+        onClick={() => router.push(`/paciente?id=${patient.id}`)}
         className={`rounded-2xl p-5 shadow-sm border relative overflow-hidden transition-all hover:shadow-md cursor-pointer ${isDeliveryWindow ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200'}`}
       >
         <div className={`absolute top-0 left-0 w-1 h-full ${isDeliveryWindow ? 'bg-rose-400' : 'bg-gray-300'}`}></div>

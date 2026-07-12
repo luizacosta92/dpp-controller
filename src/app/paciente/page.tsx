@@ -1,10 +1,10 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { getPatientById, updatePatientWithAudit, markPatientAsFinished, checkUserAuthorization } from "@/lib/firebase/firestore";
 import { Patient, DnvStatus } from "@/types/patient";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Save, FileText, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -51,9 +51,9 @@ const SHEETS_FIELDS = [
   { key: 'status', label: 'Status' }
 ];
 
-export default function PatientDetails({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const { id } = resolvedParams;
+function PatientDetailsContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -65,6 +65,10 @@ export default function PatientDetails({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     const fetchPatientAndCheckAuth = async () => {
+      if (!id) {
+        router.push("/");
+        return;
+      }
       if (user && user.email) {
         const isAuth = await checkUserAuthorization(user.email);
         setIsCheckingAuth(false);
@@ -260,5 +264,13 @@ export default function PatientDetails({ params }: { params: Promise<{ id: strin
 
       </div>
     </div>
+  );
+}
+
+export default function PatientDetails() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-rose-50"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div></div>}>
+      <PatientDetailsContent />
+    </Suspense>
   );
 }

@@ -111,7 +111,7 @@ export default function Home() {
       return {
         weeks: currentWeeks,
         days: currentDays,
-        isDeliveryWindow: currentWeeks >= 38 && currentWeeks <= 42,
+        isDeliveryWindow: currentWeeks >= 37,
         parsedDate: dppDate
       };
     } catch {
@@ -255,7 +255,7 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
-        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2 mt-4 px-2">Janela de Parto (38 a 42 sem)</h3>
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2 mt-4 px-2">Janela de parto - a partir de 37 semanas</h3>
         
         {deliveryWindowPatients.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
@@ -263,7 +263,7 @@ export default function Home() {
               <Activity className="text-rose-400 w-8 h-8" />
             </div>
             <h3 className="text-lg font-medium text-gray-900">Nenhuma gestante na janela</h3>
-            <p className="text-gray-500 mt-1 text-sm">O painel principal mostrará pacientes entre 38 e 42 semanas.</p>
+            <p className="text-gray-500 mt-1 text-sm">O painel principal mostrará pacientes a partir de 37 semanas.</p>
           </div>
         ) : (
           deliveryWindowPatients.map(patient => renderPatientCard(patient, true))

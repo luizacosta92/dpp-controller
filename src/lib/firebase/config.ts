@@ -15,19 +15,11 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const isBrowser = typeof window !== "undefined";
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Initialize Firebase only in the browser to avoid build-time auth initialization errors.
-const app: FirebaseApp = isBrowser
-  ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig))
-  : ({} as FirebaseApp);
-
-// Initialize Firebase Services
-const auth: Auth = isBrowser ? getAuth(app) : ({} as Auth);
-const db: Firestore = isBrowser ? getFirestore(app) : ({} as Firestore);
-
-// Enable Offline Persistence
-if (isBrowser) {
+if (typeof window !== "undefined") {
   enableMultiTabIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
       console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");

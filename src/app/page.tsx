@@ -6,7 +6,7 @@ import { auth } from "@/lib/firebase/config";
 import { useState, useEffect } from "react";
 import { getActivePatients, markPatientAsFinished, checkUserAuthorization } from "@/lib/firebase/firestore";
 import { Patient } from "@/types/patient";
-import { parse, differenceInWeeks, isValid } from "date-fns";
+import { parse, differenceInDays, isValid } from "date-fns";
 import { CalendarHeart, MapPin, User as UserIcon, Activity, CheckCircle, LogOut, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -87,7 +87,7 @@ export default function Home() {
   // Helper function to calculate weeks and parse date
   const getGestationInfo = (dppString: string) => {
     try {
-      if (!dppString) return { weeks: 0, isDeliveryWindow: false, parsedDate: null };
+      if (!dppString) return { weeks: 0, days: 0, isDeliveryWindow: false, parsedDate: null };
 
       let dppDate = parse(dppString, "dd/MM/yyyy", new Date());
       if (!isValid(dppDate)) {
@@ -98,20 +98,24 @@ export default function Home() {
         dppDate = new Date(dppString);
       }
       
-      if (!isValid(dppDate)) return { weeks: 0, isDeliveryWindow: false, parsedDate: null };
+      if (!isValid(dppDate)) return { weeks: 0, days: 0, isDeliveryWindow: false, parsedDate: null };
       
       const today = new Date();
-      // If DPP is 40 weeks, weeks remaining to DPP:
-      const weeksToDpp = differenceInWeeks(dppDate, today);
-      const currentWeeks = 40 - weeksToDpp;
+      // 40 weeks = 280 days
+      const daysToDpp = differenceInDays(dppDate, today);
+      const totalDays = 280 - daysToDpp;
+      
+      const currentWeeks = Math.floor(totalDays / 7);
+      const currentDays = totalDays % 7;
       
       return {
         weeks: currentWeeks,
+        days: currentDays,
         isDeliveryWindow: currentWeeks >= 38 && currentWeeks <= 42,
         parsedDate: dppDate
       };
     } catch {
-      return { weeks: 0, isDeliveryWindow: false, parsedDate: null };
+      return { weeks: 0, days: 0, isDeliveryWindow: false, parsedDate: null };
     }
   };
 
@@ -171,7 +175,7 @@ export default function Home() {
       return 0;
     });
 
-  const renderPatientCard = (patient: Patient & { weeks: number }, isDeliveryWindow: boolean) => {
+  const renderPatientCard = (patient: Patient & { weeks: number, days: number }, isDeliveryWindow: boolean) => {
     const dnv = patient.dnvStatus || 'Solicitar';
     const canFinish = dnv === 'Hospitalar' || dnv === 'Cópia entregue à SMS';
     
@@ -193,7 +197,7 @@ export default function Home() {
             </div>
           </div>
           <div className={`${isDeliveryWindow ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'} px-3 py-1 rounded-full text-sm font-bold shadow-sm whitespace-nowrap`}>
-            {patient.weeks} sem
+            {patient.weeks} sem + {patient.days} d
           </div>
         </div>
 

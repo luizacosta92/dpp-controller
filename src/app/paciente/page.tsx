@@ -14,7 +14,6 @@ const DNV_OPTIONS: DnvStatus[] = [
 ];
 
 const SHEETS_FIELDS = [
-  { key: 'timestamp', label: 'Timestamp' },
   { key: 'email', label: 'Email Address' },
   { key: 'name', label: 'Nome da gestante' },
   { key: 'babyName', label: 'Nome do bebê' },

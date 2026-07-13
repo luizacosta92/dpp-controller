@@ -26,21 +26,29 @@ export const syncPatientData = functions.https.onRequest(async (req, res) => {
     const doc = await patientRef.get();
     
     // Normalize Status (remove spaces, ignore case)
-    const normalizedStatus = String(status || '').trim().toLowerCase();
-    const patientStatus = normalizedStatus === 'finalizado' ? 'Finalizado' : 'Acompanhando';
+    const rawStatus = String(status || '').trim();
+    const patientStatus = rawStatus === '' ? 'Acompanhando' : rawStatus;
 
-    // Normalize Date (convert ISO to dd/MM/yyyy if necessary)
-    if (dpp && typeof dpp === 'string' && dpp.includes('T')) {
-      try {
-        const d = new Date(dpp);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        dpp = `${day}/${month}/${year}`;
-      } catch (e) {
-        // keep original if parsing fails
+    // Função para normalizar datas (converte ISO para dd/MM/yyyy)
+    const formatIsoDate = (dateStr: any) => {
+      if (dateStr && typeof dateStr === 'string' && dateStr.includes('T')) {
+        try {
+          const d = new Date(dateStr);
+          const day = String(d.getUTCDate()).padStart(2, '0');
+          const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const year = d.getUTCFullYear();
+          return `${day}/${month}/${year}`;
+        } catch (e) {
+          return dateStr;
+        }
       }
-    }
+      return dateStr;
+    };
+
+    dpp = formatIsoDate(data.dpp);
+    if (rest.dum) rest.dum = formatIsoDate(rest.dum);
+    if (rest.birthDate) rest.birthDate = formatIsoDate(rest.birthDate);
+    if (rest.spouseBirthDate) rest.spouseBirthDate = formatIsoDate(rest.spouseBirthDate);
 
     // Shield local fields (ensure webhook never overwrites them)
     delete rest.dnvStatus;

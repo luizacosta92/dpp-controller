@@ -37,12 +37,13 @@ export interface Patient {
   spouseCityState?: string;
   howDidYouKnow?: string;
   birthLocation?: string;
-  status: 'Acompanhando' | 'Finalizado';
+  status: 'Acompanhando' | 'Finalizado' | 'Excluído';
   
   // App-exclusive fields (not overwritten by webhook)
   dnvStatus?: DnvStatus;
   last_edited_by?: string;
   last_edited_at?: unknown;
+  deleted_at?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
 }

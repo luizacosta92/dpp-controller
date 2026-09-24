@@ -4,10 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { useState, useEffect } from "react";
-import { getActivePatients, markPatientAsFinished, checkUserAuthorization } from "@/lib/firebase/firestore";
+import { getActivePatients, markPatientAsFinished, deletePatientTracking, checkUserAuthorization } from "@/lib/firebase/firestore";
 import { Patient } from "@/types/patient";
 import { parse, differenceInDays, isValid } from "date-fns";
-import { CalendarHeart, MapPin, User as UserIcon, Activity, CheckCircle, LogOut, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { CalendarHeart, MapPin, User as UserIcon, Activity, CheckCircle, LogOut, ChevronDown, ChevronUp, FileText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -84,6 +84,14 @@ export default function Home() {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, patient: Patient) => {
+    e.stopPropagation(); // prevent card click
+    
+    if (confirm(`Tem certeza que deseja excluir o acompanhamento de "${patient.name}"? O registro será movido para o histórico como excluído.`)) {
+      await deletePatientTracking(patient.id, user?.email || 'unknown');
+    }
+  };
+
   // Helper function to calculate weeks and parse date
   const getGestationInfo = (dppString: string) => {
     try {
@@ -99,6 +107,11 @@ export default function Home() {
       }
       
       if (!isValid(dppDate)) return { weeks: 0, days: 0, isDeliveryWindow: false, parsedDate: null };
+
+      // Corrige anos digitados com 2 dígitos ou ano abreviado (ex: 0024 -> 2024)
+      if (dppDate.getFullYear() < 100) {
+        dppDate.setFullYear(dppDate.getFullYear() + 2000);
+      }
       
       const today = new Date();
       // 40 weeks = 280 days
@@ -108,10 +121,13 @@ export default function Home() {
       const currentWeeks = Math.floor(totalDays / 7);
       const currentDays = totalDays % 7;
       
+      // A janela de parto ativa compreende entre 37 e 44 semanas de gestação
+      const isDeliveryWindow = currentWeeks >= 37 && currentWeeks <= 44;
+      
       return {
         weeks: currentWeeks,
         days: currentDays,
-        isDeliveryWindow: currentWeeks >= 37,
+        isDeliveryWindow,
         parsedDate: dppDate
       };
     } catch {
@@ -196,8 +212,21 @@ export default function Home() {
               {patient.babyName && <span className="text-gray-400">Bebê: {patient.babyName}</span>}
             </div>
           </div>
-          <div className={`${isDeliveryWindow ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'} px-3 py-1 rounded-full text-sm font-bold shadow-sm whitespace-nowrap`}>
-            {patient.weeks} sem + {patient.days} d
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <div className={`${isDeliveryWindow ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'} px-3 py-1 rounded-full text-sm font-bold shadow-sm whitespace-nowrap`}>
+              {patient.weeks} sem + {patient.days} d
+            </div>
+            {patient.birthLocation && (
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${
+                patient.birthLocation.trim().toLowerCase().includes('domiciliar')
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : patient.birthLocation.trim().toLowerCase().includes('hospitalar')
+                  ? 'bg-blue-100 text-blue-800 border-blue-300'
+                  : 'bg-gray-100 text-gray-700 border-gray-300'
+              }`}>
+                {patient.birthLocation}
+              </span>
+            )}
           </div>
         </div>
 
@@ -219,18 +248,29 @@ export default function Home() {
           </div>
         </div>
 
-        <button 
-          onClick={(e) => handleFinish(e, patient)}
-          disabled={!canFinish}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl transition-colors font-medium border
-            ${canFinish 
-              ? 'bg-gray-50 hover:bg-green-50 text-gray-600 hover:text-green-600 border-gray-200' 
-              : 'bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed opacity-70'
-            }`}
-        >
-          <CheckCircle className="w-5 h-5" />
-          Finalizar Acompanhamento
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+          <button 
+            onClick={(e) => handleFinish(e, patient)}
+            disabled={!canFinish}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-colors font-medium border text-sm
+              ${canFinish 
+                ? 'bg-gray-50 hover:bg-green-50 text-gray-700 hover:text-green-700 border-gray-200 shadow-2xs' 
+                : 'bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed opacity-70'
+              }`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            Finalizar Acompanhamento
+          </button>
+          
+          <button
+            onClick={(e) => handleDelete(e, patient)}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl transition-colors font-medium border bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 border-gray-200 text-sm shadow-2xs"
+            title="Excluir acompanhamento"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Excluir</span>
+          </button>
+        </div>
       </div>
     );
   };

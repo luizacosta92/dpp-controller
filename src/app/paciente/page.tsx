@@ -2,10 +2,10 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState, Suspense } from "react";
-import { getPatientById, updatePatientWithAudit, markPatientAsFinished, checkUserAuthorization } from "@/lib/firebase/firestore";
+import { getPatientById, updatePatientWithAudit, markPatientAsFinished, deletePatientTracking, checkUserAuthorization } from "@/lib/firebase/firestore";
 import { Patient, DnvStatus } from "@/types/patient";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Save, FileText, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, FileText, CheckCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 const DNV_OPTIONS: DnvStatus[] = [
@@ -143,6 +143,16 @@ function PatientDetailsContent() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!patient || !user?.email) return;
+    if (confirm(`Tem certeza que deseja excluir o acompanhamento de "${patient.name}"? O registro será movido para o histórico como excluído.`)) {
+      await deletePatientTracking(patient.id, user.email);
+      setPatient({ ...patient, status: 'Excluído' });
+      setFormData(prev => ({ ...prev, status: 'Excluído' }));
+      router.push("/");
+    }
+  };
+
   if (loading || isCheckingAuth || !patient) {
     return <div className="flex h-screen items-center justify-center bg-rose-50"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div></div>;
   }
@@ -250,6 +260,19 @@ function PatientDetailsContent() {
                   Requer DNV como &quot;Hospitalar&quot; ou &quot;Cópia entregue à SMS&quot;
                 </p>
               )}
+
+              <button 
+                onClick={handleDelete}
+                disabled={patient.status === 'Excluído'}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl transition-colors font-medium border mt-3
+                  ${patient.status === 'Excluído'
+                    ? 'bg-rose-100 text-rose-700 border-rose-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 border-gray-200 shadow-2xs'
+                  }`}
+              >
+                <Trash2 className="w-5 h-5" />
+                {patient.status === 'Excluído' ? 'Acompanhamento Excluído' : 'Excluir Acompanhamento'}
+              </button>
             </div>
             
             {(patient.last_edited_by || formData.last_edited_by) && (

@@ -56,3 +56,15 @@ export const markPatientAsFinished = async (patientId: string, userEmail: string
     updatedAt: new Date()
   });
 };
+
+export const deletePatientTracking = async (patientId: string, userEmail: string) => {
+  const patientRef = doc(db, "patients", patientId);
+  await updateDoc(patientRef, {
+    status: "Excluído",
+    last_edited_by: userEmail,
+    last_edited_at: new Date(),
+    updatedAt: new Date(),
+    deleted_at: new Date()
+  });
+};
+

@@ -7,29 +7,18 @@ const db = admin.firestore();
 // 1. Webhook para Sincronizar com Google Sheets
 export const syncPatientData = functions.https.onRequest(async (req, res) => {
   try {
-    // Validação básica de segurança (opcional, pode ser melhorada com tokens)
     if (req.method !== 'POST') {
       res.status(405).send('Method Not Allowed');
       return;
     }
 
-    const data = req.body;
-    if (!data || !data.id || !data.name) {
-      res.status(400).send('Bad Request: Missing required fields');
+    const body = req.body;
+    if (!body) {
+      res.status(400).send('Bad Request: Missing body');
       return;
     }
 
-    const { id, status, ...rest } = data;
-    let dpp = data.dpp;
-    const patientRef = db.collection("patients").doc(String(id));
-
-    const doc = await patientRef.get();
-    
-    // Normalize Status (remove spaces, ignore case)
-    const rawStatus = String(status || '').trim();
-    const patientStatus = rawStatus === '' ? 'Acompanhando' : rawStatus;
-
-    // Função para normalizar datas (converte ISO para dd/MM/yyyy)
+    // Função para normalizar datas (converte ISO/Date para dd/MM/yyyy)
     const formatIsoDate = (dateStr: any) => {
       if (dateStr && typeof dateStr === 'string' && dateStr.includes('T')) {
         try {
@@ -45,32 +34,91 @@ export const syncPatientData = functions.https.onRequest(async (req, res) => {
       return dateStr;
     };
 
-    dpp = formatIsoDate(data.dpp);
-    if (rest.dum) rest.dum = formatIsoDate(rest.dum);
-    if (rest.birthDate) rest.birthDate = formatIsoDate(rest.birthDate);
-    if (rest.spouseBirthDate) rest.spouseBirthDate = formatIsoDate(rest.spouseBirthDate);
+    // Helper para processar um único paciente
+    const processPatientData = (patientRaw: any, existingDocData?: admin.firestore.DocumentData) => {
+      const { id, status, ...rest } = patientRaw;
+      
+      const rawStatus = String(status || '').trim();
+      let patientStatus = 'Acompanhando';
 
-    // Shield local fields (ensure webhook never overwrites them)
-    delete rest.dnvStatus;
-    delete rest.last_edited_by;
-    delete rest.last_edited_at;
+      if (rawStatus.toLowerCase() === 'finalizado') {
+        patientStatus = 'Finalizado';
+      } else if (rawStatus.toLowerCase() === 'excluido' || rawStatus.toLowerCase() === 'excluído') {
+        patientStatus = 'Excluído';
+      } else if (rawStatus !== '') {
+        patientStatus = rawStatus;
+      } else if (existingDocData && (existingDocData.status === 'Finalizado' || existingDocData.status === 'Excluído')) {
+        // Se já estava finalizado ou excluído no app e a planilha não informou status, mantém o status existente
+        patientStatus = existingDocData.status;
+      }
 
-    const payload = {
-      ...rest,
-      dpp,
-      status: patientStatus,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      let dpp = formatIsoDate(patientRaw.dpp);
+      if (rest.dum) rest.dum = formatIsoDate(rest.dum);
+      if (rest.birthDate) rest.birthDate = formatIsoDate(rest.birthDate);
+      if (rest.spouseBirthDate) rest.spouseBirthDate = formatIsoDate(rest.spouseBirthDate);
+
+      // Shield local fields (evita sobrescrever alterações feitas exclusivamente no PWA)
+      delete rest.dnvStatus;
+      delete rest.last_edited_by;
+      delete rest.last_edited_at;
+      delete rest.deleted_at;
+
+      const payload: any = {
+        ...rest,
+        dpp,
+        status: patientStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (!existingDocData) {
+        payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        payload.dnvStatus = 'Solicitar';
+      }
+
+      return { docId: String(id), payload };
     };
 
-    if (!doc.exists) {
-      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
-      // Only set initial DNV status for new patients
-      payload.dnvStatus = 'Solicitar';
+    // Suporte a lote (batch de múltiplos pacientes)
+    const patientsList: any[] = Array.isArray(body) ? body : (body.patients && Array.isArray(body.patients) ? body.patients : null);
+
+    if (patientsList) {
+      if (patientsList.length === 0) {
+        res.status(200).send({ success: true, message: 'No patients to sync' });
+        return;
+      }
+
+      const batch = db.batch();
+      
+      // Buscar documentos existentes em paralelo para preservar status e dnvStatus
+      const docRefs = patientsList.filter(p => p && p.id && p.name).map(p => db.collection("patients").doc(String(p.id)));
+      const snapshots = await db.getAll(...docRefs);
+      const snapshotMap = new Map(snapshots.map(s => [s.id, s.exists ? s.data() : undefined]));
+
+      for (const p of patientsList) {
+        if (!p || !p.id || !p.name) continue;
+        const existingData = snapshotMap.get(String(p.id));
+        const { docId, payload } = processPatientData(p, existingData);
+        const ref = db.collection("patients").doc(docId);
+        batch.set(ref, payload, { merge: true });
+      }
+
+      await batch.commit();
+      res.status(200).send({ success: true, count: patientsList.length, message: 'Batch patients synced successfully' });
+      return;
     }
 
-    // Upsert na coleção patients using merge: true to avoid overwriting existing shielded fields
-    await patientRef.set(payload, { merge: true });
+    // Suporte a envio de um único paciente
+    if (!body.id || !body.name) {
+      res.status(400).send('Bad Request: Missing required fields (id, name)');
+      return;
+    }
 
+    const patientRef = db.collection("patients").doc(String(body.id));
+    const doc = await patientRef.get();
+    const existingData = doc.exists ? doc.data() : undefined;
+    const { payload } = processPatientData(body, existingData);
+
+    await patientRef.set(payload, { merge: true });
     res.status(200).send({ success: true, message: 'Patient synced successfully' });
   } catch (error) {
     console.error("Error syncing patient data:", error);
